@@ -1,0 +1,186 @@
+FULL ORDERED PROMPT LIST (START → FINISH)
+🔹 PHASE 0 — FOUNDATION (DO THESE FIRST)
+Prompt 1: Architecture & Stack Validation (Tech Lead)
+You are a principal software architect.
+
+Review @project.md and:
+- Validate the tech stack
+- Propose final system architecture
+- Identify major technical risks
+- Define service boundaries (frontend, backend, realtime, auth)
+- Recommend any adjustments BEFORE coding begins
+
+No code yet.
+Prompt 2: Environment & Secrets Setup
+You are a senior DevOps engineer.
+
+Based on @project.md and the chosen stack:
+- List ALL required environment variables
+- Separate local, staging, and production
+- Include Supabase, auth, storage, and realtime variables
+- Explain what each variable does
+
+No code yet.
+Prompt 3: Supabase Project Setup
+You are a senior backend engineer.
+
+Guide me step-by-step to:
+- Create a Supabase project
+- Configure auth (email/password)
+- Enable Row Level Security (RLS)
+- Set up storage buckets
+- Prepare realtime subscriptions
+
+Do not write app code yet.
+🔹 PHASE 1 — DATABASE & SECURITY (CRITICAL)
+Prompt 4: Database Schema Design
+You are a senior database architect.
+
+Using @project.md:
+- Design the PostgreSQL schema
+- Include tables for users, profiles, identity_scopes, cirvias, messages, posts, reports, audit_logs
+- Explain relationships
+- Define indexes
+- Highlight security-critical fields
+
+No SQL yet — schema design only.
+Prompt 5: Supabase RLS Policies
+You are a security-focused backend engineer.
+
+Using the schema:
+- Design Row Level Security (RLS) policies
+- Ensure users can only see data allowed by identity scope
+- Prevent admins/moderators from seeing hidden identities
+- Cover edge cases
+
+Explain policies clearly before writing SQL.
+Prompt 6: Write SQL Migrations
+Write production-ready SQL migrations for the approved schema and RLS policies.
+
+Assume Supabase PostgreSQL.
+🔹 PHASE 2 — AUTH & IDENTITY SYSTEM
+Prompt 7: Auth Flow Implementation
+You are a senior frontend + backend engineer.
+
+Implement:
+- Email/password signup
+- Email verification
+- Login/logout
+- JWT handling
+- Session persistence
+
+Follow Supabase best practices.
+Prompt 8: Scoped Identity Engine (CORE FEATURE)
+This is the most important feature.
+
+Design and implement the Scoped Identity system described in @project.md:
+- Anonymous / Partial / Full identity
+- Per-chat and per-group scoping
+- Identity reveal and revocation rules
+- Server-enforced identity resolution
+
+Explain the logic clearly before coding.
+🔹 PHASE 3 — CORE APP FEATURES
+Prompt 9: Cirvia (Group) System
+Implement Cirvia (group) creation and management:
+- Public vs private
+- Invite-only default
+- Role management
+- Membership rules
+
+Follow the PRD strictly.
+Prompt 10: Messaging System
+Implement:
+- 1:1 messaging
+- Group chat
+- Realtime updates
+- Scoped identity enforcement per message
+
+Include moderation hooks.
+Prompt 11: Feed & Posts
+Implement:
+- Text/image posts
+- Likes and comments
+- Scoped identity display
+- Edit/delete permissions
+
+No gamification.
+🔹 PHASE 4 — TRUST & SAFETY
+Prompt 12: Reporting & Moderation
+Implement:
+- Reporting system
+- Auto-mute logic
+- Shadow banning
+- Audit logging
+- Moderator limitations
+
+Security over convenience.
+Prompt 13: Admin Dashboard
+Build an admin dashboard with:
+- User management
+- Report queue
+- Moderation actions
+- System health
+
+Admins must NOT access private chats without reports.
+🔹 PHASE 5 — QA, HARDENING, & LAUNCH
+Prompt 14: Security Review
+Perform a full security review:
+- Auth
+- RLS
+- Identity leakage
+- Admin abuse prevention
+- Rate limits
+
+List vulnerabilities and fixes.
+Prompt 15: Performance & Scalability
+Review the system for:
+- Bottlenecks
+- Scaling risks
+- Realtime limits
+- Cost optimizations
+
+Recommend improvements.
+Prompt 16: Pre-Launch Checklist
+Create a production readiness checklist:
+- Env vars
+- Security
+- Monitoring
+- Backups
+- Legal pages
+- App store readiness
+PART 4: GENERIC “FIX ANYTHING” PROMPTS (VERY IMPORTANT)
+You’ll reuse these constantly 👇
+🔧 Debugging Prompt
+You are a senior engineer.
+
+I am getting the following error:
+<PASTE ERROR>
+
+Context:
+- Tech stack: Next.js + Supabase
+- This feature relates to: <feature>
+
+Diagnose the root cause and provide a clean fix.
+🧠 Refactor Prompt
+Refactor this code to:
+- Improve readability
+- Improve security
+- Follow best practices
+- Avoid breaking functionality
+
+Explain changes briefly.
+🔒 Security Fix Prompt
+Review this code for security vulnerabilities.
+Fix any issues found and explain why.
+🚑 Emergency Fix Prompt
+Production is broken.
+
+Symptoms:
+<describe>
+
+Logs:
+<paste>
+
+Fix the issue with minimal disruption.
+Explain what happened and how to prevent it.
