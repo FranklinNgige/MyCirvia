@@ -4,6 +4,7 @@ pnpm-lock.yaml
 .env.local
 .env.*.local
 .DS_Store
+<<<<<<< ours
 apps/**/dist
 apps/**/.next
 apps/**/coverage
@@ -12,3 +13,9 @@ apps/**/.turbo
 apps/**/.cache
 apps/**/build
 infra/data
+=======
+node_modules/
+dist/
+.env
+coverage/
+>>>>>>> theirs
