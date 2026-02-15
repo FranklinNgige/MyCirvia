@@ -5,6 +5,7 @@ pnpm-lock.yaml
 .env.*.local
 .DS_Store
 <<<<<<< ours
+<<<<<<< ours
 apps/**/dist
 apps/**/.next
 apps/**/coverage
@@ -18,4 +19,8 @@ node_modules/
 dist/
 .env
 coverage/
+>>>>>>> theirs
+=======
+
+node_modules
 >>>>>>> theirs

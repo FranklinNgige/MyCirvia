@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+<<<<<<< ours
     "module": "commonjs",
     "declaration": false,
     "removeComments": true,
@@ -15,4 +16,16 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*", "test/**/*"]
+=======
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src", "tests"]
+>>>>>>> theirs
 }
