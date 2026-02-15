@@ -1,1 +1,14 @@
+node_modules
+pnpm-lock.yaml
+.env
+.env.local
+.env.*.local
 .DS_Store
+apps/**/dist
+apps/**/.next
+apps/**/coverage
+apps/**/node_modules
+apps/**/.turbo
+apps/**/.cache
+apps/**/build
+infra/data
