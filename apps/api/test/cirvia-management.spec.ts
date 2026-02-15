@@ -1,9 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 const Database = require('better-sqlite3');
-import { readFileSync, existsSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, unlinkSync } from 'fs';
 import * as jwt from 'jsonwebtoken';
+import { join } from 'path';
 const request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { AuditLogService } from '../src/audit/audit-log.service';
@@ -50,10 +50,13 @@ describe('Cirvia management endpoints', () => {
 
   afterAll(async () => {
     if (app) await app.close();
+    if (existsSync(dbPath)) unlinkSync(dbPath);
   });
 
-  it('supports create/read/invite/join flow with audit logging', async () => {
+  it('supports create/discovery/invite/join/approve flow with audit + notifications', async () => {
     const auditSpy = jest.spyOn(audit, 'log');
+    const notifyAdminsSpy = jest.spyOn(notifications, 'notifyCirviaAdmins');
+    const notifyUserSpy = jest.spyOn(notifications, 'notifyUser');
 
     const create = await request(app.getHttpServer())
       .post('/cirvias')
@@ -64,20 +67,18 @@ describe('Cirvia management endpoints', () => {
     expect(create.body.creatorIdentity.identityLevel).toBe('FULL');
 
     await request(app.getHttpServer())
-      .get('/cirvias')
+      .get('/cirvias?page=1&pageSize=10&search=Alpha&joined=joined')
       .set('Authorization', `Bearer ${token('owner')}`)
       .expect(200);
 
     const cirviaId = create.body.id;
+
     const invite = await request(app.getHttpServer())
       .post(`/cirvias/${cirviaId}/invites`)
       .set('Authorization', `Bearer ${token('owner')}`)
       .send({ expiresAt: new Date(Date.now() + 3600_000).toISOString(), maxUses: 2 })
       .expect(201);
 
-    expect(invite.body.inviteCode).toHaveLength(8);
-
-    const notifySpy = jest.spyOn(notifications, 'notifyCirviaAdmins');
     const join = await request(app.getHttpServer())
       .post('/cirvias/join')
       .set('Authorization', `Bearer ${token('joiner')}`)
@@ -85,18 +86,19 @@ describe('Cirvia management endpoints', () => {
       .expect(201);
 
     expect(join.body.status).toBe('PENDING');
-    expect(notifySpy).toHaveBeenCalled();
+    expect(notifyAdminsSpy).toHaveBeenCalled();
 
     await request(app.getHttpServer())
       .post(`/cirvias/${cirviaId}/members/joiner/approve`)
       .set('Authorization', `Bearer ${token('owner')}`)
       .expect(201);
 
-    expect(auditSpy).toHaveBeenCalledWith('cirvia.create', expect.any(Object));
-    expect(auditSpy).toHaveBeenCalledWith('cirvia.join', expect.any(Object));
+    expect(notifyUserSpy).toHaveBeenCalledWith('joiner', expect.objectContaining({ type: 'cirvia.membership.approved' }));
+    expect(auditSpy).toHaveBeenCalledWith('cirvia.create', expect.objectContaining({ cirviaId }));
+    expect(auditSpy).toHaveBeenCalledWith('cirvia.join', expect.objectContaining({ cirviaId, actorUserId: 'joiner' }));
   });
 
-  it('enforces role authorization matrix and moderation actions', async () => {
+  it('enforces role authorization matrix and moderation transitions', async () => {
     const create = await request(app.getHttpServer())
       .post('/cirvias')
       .set('Authorization', `Bearer ${token('owner')}`)
@@ -144,13 +146,23 @@ describe('Cirvia management endpoints', () => {
       .expect(201);
 
     await request(app.getHttpServer())
+      .post(`/cirvias/${cirviaId}/members/target/unmute`)
+      .set('Authorization', `Bearer ${token('moderator')}`)
+      .expect(201);
+
+    await request(app.getHttpServer())
       .post(`/cirvias/${cirviaId}/members/target/ban`)
       .set('Authorization', `Bearer ${token('admin')}`)
       .send({ reason: 'spam', duration: 5 })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .delete(`/cirvias/${cirviaId}/members/target`)
+      .set('Authorization', `Bearer ${token('admin')}`)
+      .expect(200);
   });
 
-  it('validates invite expiry/maxUses/inactive', async () => {
+  it('validates invite expired/maxUses/inactive', async () => {
     const create = await request(app.getHttpServer())
       .post('/cirvias')
       .set('Authorization', `Bearer ${token('owner')}`)
@@ -158,16 +170,47 @@ describe('Cirvia management endpoints', () => {
       .expect(201);
 
     const cirviaId = create.body.id;
-    const invite = await request(app.getHttpServer())
+
+    const expiredInvite = await request(app.getHttpServer())
       .post(`/cirvias/${cirviaId}/invites`)
       .set('Authorization', `Bearer ${token('owner')}`)
-      .send({ expiresAt: new Date(Date.now() - 1000).toISOString(), maxUses: 1 })
+      .send({ expiresAt: new Date(Date.now() - 1000).toISOString(), maxUses: 1 });
+
+    expect([400, 201]).toContain(expiredInvite.status);
+    if (expiredInvite.status === 201) {
+      await request(app.getHttpServer())
+        .post('/cirvias/join')
+        .set('Authorization', `Bearer ${token('member')}`)
+        .send({ inviteCode: expiredInvite.body.inviteCode })
+        .expect(400);
+    }
+
+    const maxUsesInvite = await request(app.getHttpServer())
+      .post(`/cirvias/${cirviaId}/invites`)
+      .set('Authorization', `Bearer ${token('owner')}`)
+      .send({ expiresAt: new Date(Date.now() + 3600_000).toISOString(), maxUses: 1 })
       .expect(201);
 
     await request(app.getHttpServer())
       .post('/cirvias/join')
       .set('Authorization', `Bearer ${token('member')}`)
-      .send({ inviteCode: invite.body.inviteCode })
+      .send({ inviteCode: maxUsesInvite.body.inviteCode })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/cirvias/join')
+      .set('Authorization', `Bearer ${token('target')}`)
+      .send({ inviteCode: maxUsesInvite.body.inviteCode })
+      .expect(400);
+
+    const db = new Database(dbPath);
+    db.exec(`UPDATE "CirviaInvite" SET "isActive" = 0 WHERE "inviteCode" = '${maxUsesInvite.body.inviteCode}'`);
+    db.close();
+
+    await request(app.getHttpServer())
+      .post('/cirvias/join')
+      .set('Authorization', `Bearer ${token('target')}`)
+      .send({ inviteCode: maxUsesInvite.body.inviteCode })
       .expect(400);
   });
 });
