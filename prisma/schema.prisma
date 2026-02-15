@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IdentityLevel {
+  ANONYMOUS
+  PARTIAL
+  FULL
+}
+
+enum ScopeType {
+  GLOBAL_DEFAULT
+  CIRVIA
+  CHAT
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  profile        Profile?
+  identityScopes IdentityScope[]
+  memberships    CirviaMember[]
+  chatMembers    ChatParticipant[]
+}
+
+model Profile {
+  id         String  @id @default(cuid())
+  userId     String  @unique
+  chosenName String?
+  realName   String?
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model IdentityScope {
+  id               String        @id @default(cuid())
+  userId           String
+  scopeType        ScopeType     @default(GLOBAL_DEFAULT)
+  scopeId          String        @default("GLOBAL_DEFAULT")
+  identityLevel    IdentityLevel @default(ANONYMOUS)
+  showAgeRange     Boolean       @default(false)
+  showGender       Boolean       @default(false)
+  showProfilePhoto Boolean       @default(false)
+  showRealName     Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scopeType, scopeId])
+  @@index([userId, scopeType, scopeId])
+}
+
+model Cirvia {
+  id      String         @id @default(cuid())
+  name    String
+  members CirviaMember[]
+}
+
+model CirviaMember {
+  id       String @id @default(cuid())
+  userId   String
+  cirviaId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cirvia Cirvia @relation(fields: [cirviaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cirviaId])
+}
+
+model Chat {
+  id      String            @id @default(cuid())
+  kind    String
+  members ChatParticipant[]
+}
+
+model ChatParticipant {
+  id     String @id @default(cuid())
+  userId String
+  chatId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chatId])
+}
