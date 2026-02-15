@@ -3,114 +3,108 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-<<<<<<< ours
-enum IdentityLevel {
-  ANONYMOUS
-  PARTIAL
-  FULL
+enum CirviaVisibility {
+  PUBLIC
+  PRIVATE
 }
 
-enum ScopeType {
-  GLOBAL_DEFAULT
-  CIRVIA
-  CHAT
+enum CirviaMemberRole {
+  OWNER
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum CirviaMemberStatus {
+  PENDING
+  ACTIVE
+  BANNED
+  MUTED
 }
 
 model User {
-  id             String          @id @default(cuid())
-  email          String          @unique
-  profile        Profile?
-  identityScopes IdentityScope[]
-  memberships    CirviaMember[]
-  chatMembers    ChatParticipant[]
-}
-
-model Profile {
-  id         String  @id @default(cuid())
-  userId     String  @unique
-  chosenName String?
-  realName   String?
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model IdentityScope {
-  id               String        @id @default(cuid())
-  userId           String
-  scopeType        ScopeType     @default(GLOBAL_DEFAULT)
-  scopeId          String        @default("GLOBAL_DEFAULT")
-  identityLevel    IdentityLevel @default(ANONYMOUS)
-  showAgeRange     Boolean       @default(false)
-  showGender       Boolean       @default(false)
-  showProfilePhoto Boolean       @default(false)
-  showRealName     Boolean       @default(false)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, scopeType, scopeId])
-  @@index([userId, scopeType, scopeId])
+  id              String          @id @default(uuid())
+  email           String          @unique
+  createdAt       DateTime        @default(now())
+  cirviasCreated  Cirvia[]        @relation("CirviaCreatedBy")
+  cirviaMembers   CirviaMember[]
+  cirviaInvites   CirviaInvite[]  @relation("CirviaInviteCreatedBy")
+  identityScopes  IdentityScope[]
 }
 
 model Cirvia {
-  id      String         @id @default(cuid())
-  name    String
-  members CirviaMember[]
+  id              String            @id @default(uuid())
+  name            String            @unique
+  description     String
+  visibility      CirviaVisibility
+  requireApproval Boolean           @default(true)
+  maxMembers      Int?
+  createdById     String
+  createdBy       User              @relation("CirviaCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  members         CirviaMember[]
+  invites         CirviaInvite[]
+  chat            CirviaChat?
+  identityScopes  IdentityScope[]
 }
 
 model CirviaMember {
-  id       String @id @default(cuid())
-  userId   String
-  cirviaId String
+  id          String             @id @default(uuid())
+  cirviaId    String
+  userId      String
+  role        CirviaMemberRole
+  status      CirviaMemberStatus
+  mutedUntil  DateTime?
+  joinedAt    DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  cirvia      Cirvia             @relation(fields: [cirviaId], references: [id])
+  user        User               @relation(fields: [userId], references: [id])
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cirvia Cirvia @relation(fields: [cirviaId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, cirviaId])
+  @@index([cirviaId])
+  @@index([userId])
+  @@unique([cirviaId, userId])
 }
 
-model Chat {
-  id      String            @id @default(cuid())
-  kind    String
-  members ChatParticipant[]
+model CirviaInvite {
+  id          String   @id @default(uuid())
+  cirviaId    String
+  inviteCode  String   @unique
+  createdById String
+  expiresAt   DateTime
+  maxUses     Int?
+  usesCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  cirvia      Cirvia   @relation(fields: [cirviaId], references: [id])
+  createdBy   User     @relation("CirviaInviteCreatedBy", fields: [createdById], references: [id])
+
+  @@index([cirviaId])
+  @@index([inviteCode])
 }
 
-model ChatParticipant {
-  id     String @id @default(cuid())
-  userId String
-  chatId String
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, chatId])
-=======
-enum ChatIdentityRevealStatus {
-  NONE
-  ONE_SIDED_A_TO_B
-  ONE_SIDED_B_TO_A
-  MUTUAL_PENDING
-  MUTUAL_CONFIRMED
-  REVOKED_BY_A
-  REVOKED_BY_B
-  REVOKED_MUTUAL
+model CirviaChat {
+  id        String   @id @default(uuid())
+  cirviaId  String   @unique
+  createdAt DateTime @default(now())
+  cirvia    Cirvia   @relation(fields: [cirviaId], references: [id])
 }
 
-model ChatIdentityReveal {
-  id          String                   @id @default(uuid()) @db.Uuid
-  chatId      String                   @db.Uuid
-  fromUserId  String                   @db.Uuid
-  toUserId    String                   @db.Uuid
-  status      ChatIdentityRevealStatus @default(NONE)
-  initiatedAt DateTime                 @default(now())
-  confirmedAt DateTime?
-  revokedAt   DateTime?
+model IdentityScope {
+  id        String   @id @default(uuid())
+  userId    String
+  cirviaId  String
+  scope     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  cirvia    Cirvia   @relation(fields: [cirviaId], references: [id])
 
-  @@index([chatId])
-  @@unique([chatId, fromUserId, toUserId])
->>>>>>> theirs
+  @@index([userId])
+  @@index([cirviaId])
+  @@unique([userId, cirviaId, scope])
 }
