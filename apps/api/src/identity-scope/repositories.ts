@@ -1,4 +1,4 @@
-import { IdentityScope, Profile, ScopeType } from './types.js';
+import { IdentityScope, Profile, ScopeType } from './types';
 
 export interface ProfileRepository {
   getByUserId(userId: string): Promise<Profile | null>;

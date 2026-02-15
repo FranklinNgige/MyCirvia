@@ -1,5 +1,5 @@
 export type IdentityLevel = 'ANONYMOUS' | 'PARTIAL' | 'FULL';
-export type ScopeType = 'GROUP' | 'EVENT' | 'GLOBAL_DEFAULT';
+export type ScopeType = 'GROUP' | 'EVENT' | 'CIRVIA' | 'GLOBAL_DEFAULT';
 
 export interface IdentityContext {
   scopeType: ScopeType;

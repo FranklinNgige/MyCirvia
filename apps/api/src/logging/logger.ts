@@ -13,7 +13,7 @@ export const logger = pino({
         options: { colorize: true, singleLine: true },
       },
   formatters: {
-    level: (label) => ({ level: label }),
+    level: (label: string) => ({ level: label }),
   },
   mixin: () => ({ requestId: RequestContext.getStore()?.requestId }),
 });

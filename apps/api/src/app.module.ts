@@ -9,9 +9,10 @@ import { RolesGuard } from './auth/roles.guard';
 import { RequestContextMiddleware } from './common/request-context.middleware';
 import { GlobalExceptionFilter } from './errors/global-exception.filter';
 import { PermissionGuard } from './permissions/permission.guard';
+import { CirviaModule } from './cirvia/cirvia.module';
 
 @Module({
-  imports: [PassportModule],
+  imports: [PassportModule, CirviaModule],
   controllers: [AppController],
   providers: [
     JwtAccessStrategy,

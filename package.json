@@ -1,24 +1,10 @@
 {
   "name": "mycirvia",
-<<<<<<< ours
   "private": true,
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "dev:api": "pnpm --filter api dev",
     "dev:web": "pnpm --filter web dev",
     "dev:worker": "pnpm --filter worker dev"
-=======
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "devDependencies": {
-    "typescript": "^5.7.3",
-    "vitest": "^2.1.8",
-    "@types/node": "^22.10.2"
->>>>>>> theirs
   }
 }

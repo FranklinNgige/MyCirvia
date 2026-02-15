@@ -24,6 +24,7 @@ enum CirviaMemberStatus {
   ACTIVE
   BANNED
   MUTED
+  REMOVED
 }
 
 model User {
@@ -98,11 +99,11 @@ model CirviaChat {
 model IdentityScope {
   id        String   @id @default(uuid())
   userId    String
-  cirviaId  String
+  cirviaId  String?
   scope     String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
-  cirvia    Cirvia   @relation(fields: [cirviaId], references: [id])
+  cirvia    Cirvia?  @relation(fields: [cirviaId], references: [id])
 
   @@index([userId])
   @@index([cirviaId])

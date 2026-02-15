@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
-import Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+const Database = require('better-sqlite3');
 
 const migrationSql = readFileSync('prisma/migrations/20260214170000_cirvia_schema/migration.sql', 'utf8');
 

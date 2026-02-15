@@ -1,5 +1,5 @@
-import { AvatarSigner, IdentityScopeRepository, ProfileRepository } from '../repositories.js';
-import { IdentityContext, IdentityScope, Profile, ResolvedIdentityDTO } from '../types.js';
+import { AvatarSigner, IdentityScopeRepository, ProfileRepository } from '../repositories';
+import { IdentityContext, IdentityScope, Profile, ResolvedIdentityDTO } from '../types';
 
 export class NotFoundError extends Error {}
 
