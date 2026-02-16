@@ -10,9 +10,10 @@ import { RequestContextMiddleware } from './common/request-context.middleware';
 import { GlobalExceptionFilter } from './errors/global-exception.filter';
 import { PermissionGuard } from './permissions/permission.guard';
 import { CirviaModule } from './cirvia/cirvia.module';
+import { FeedModule } from './feed/feed.module';
 
 @Module({
-  imports: [PassportModule, CirviaModule],
+  imports: [PassportModule, CirviaModule, FeedModule],
   controllers: [AppController],
   providers: [
     JwtAccessStrategy,

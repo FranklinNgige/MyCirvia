@@ -7,26 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum CirviaVisibility {
-  PUBLIC
-  PRIVATE
-}
-
-enum CirviaMemberRole {
-  OWNER
-  ADMIN
-  MODERATOR
-  MEMBER
-}
-
-enum CirviaMemberStatus {
-  PENDING
-  ACTIVE
-  BANNED
-  MUTED
-  REMOVED
-}
-
 model User {
   id              String          @id @default(uuid())
   email           String          @unique
@@ -35,13 +15,17 @@ model User {
   cirviaMembers   CirviaMember[]
   cirviaInvites   CirviaInvite[]  @relation("CirviaInviteCreatedBy")
   identityScopes  IdentityScope[]
+  posts           Post[]
+  comments        Comment[]
+  postLikes       PostLike[]
+  commentLikes    CommentLike[]
 }
 
 model Cirvia {
   id              String            @id @default(uuid())
   name            String            @unique
   description     String
-  visibility      CirviaVisibility
+  visibility      String
   requireApproval Boolean           @default(true)
   maxMembers      Int?
   createdById     String
@@ -53,14 +37,15 @@ model Cirvia {
   invites         CirviaInvite[]
   chat            CirviaChat?
   identityScopes  IdentityScope[]
+  posts           Post[]
 }
 
 model CirviaMember {
   id          String             @id @default(uuid())
   cirviaId    String
   userId      String
-  role        CirviaMemberRole
-  status      CirviaMemberStatus
+  role        String
+  status      String
   mutedUntil  DateTime?
   joinedAt    DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
@@ -116,4 +101,73 @@ model IdentityScope {
   @@index([userId])
   @@index([cirviaId])
   @@unique([userId, cirviaId, scope])
+}
+
+model Post {
+  id          String         @id @default(uuid())
+  cirviaId    String
+  authorId    String
+  contentText String
+  mediaKeys   String?
+  visibility  String         @default("MEMBERS_ONLY")
+  isPinned    Boolean        @default(false)
+  isDeleted   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+  cirvia      Cirvia         @relation(fields: [cirviaId], references: [id])
+  author      User           @relation(fields: [authorId], references: [id])
+  comments    Comment[]
+  likes       PostLike[]
+
+  @@index([cirviaId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id              String        @id @default(uuid())
+  postId          String
+  authorId        String
+  contentText     String
+  parentCommentId String?
+  isDeleted       Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+  post            Post          @relation(fields: [postId], references: [id])
+  author          User          @relation(fields: [authorId], references: [id])
+  parentComment   Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id])
+  replies         Comment[]     @relation("CommentReplies")
+  likes           CommentLike[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model PostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([postId])
+  @@index([userId])
+  @@unique([postId, userId])
+}
+
+model CommentLike {
+  id        String   @id @default(uuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([commentId])
+  @@index([userId])
+  @@unique([commentId, userId])
 }

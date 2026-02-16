@@ -98,8 +98,7 @@ async function main() {
       data: [
         { userId: membership.userId, cirviaId: membership.cirviaId, scope: 'cirvia:read' },
         { userId: membership.userId, cirviaId: membership.cirviaId, scope: 'cirvia:chat' }
-      ],
-      skipDuplicates: true
+      ]
     });
   }
 
