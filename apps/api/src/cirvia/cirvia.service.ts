@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { AuditLogService } from '../audit/audit-log.service';
 import { IdentityScopeRepository, ProfileRepository, AvatarSigner } from '../identity-scope/repositories';
 import { IdentityResolverService } from '../identity-scope/services/IdentityResolverService';
-import { IdentityScope, Profile, ScopeType } from '../identity-scope/types';
+import { IdentityScope, Profile, ResolvedIdentityDTO, ScopeType } from '../identity-scope/types';
 import { NotificationService } from '../notifications/notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -70,30 +70,37 @@ class DbIdentityScopeRepository implements IdentityScopeRepository {
       return null;
     }
 
-    const row = this.db.get<{ userId: string; cirviaId: string }>(
-      'SELECT userId, cirviaId FROM "IdentityScope" WHERE userId = ? AND cirviaId = ? AND scope = ?',
+    const row = this.db.get<any>(
+      `SELECT userId, cirviaId, identityLevel, showAgeRange, showGender, showCity, showState, showBio, showProfilePhoto, customAvatarKey
+       FROM "IdentityScope"
+       WHERE userId = ? AND cirviaId = ? AND scope = ?`,
       [userId, scopeId, 'CIRVIA'],
     );
 
-    return row ? this.toIdentityScope(row.userId, row.cirviaId) : null;
+    return row ? this.toIdentityScope(row) : null;
   }
 
   async getGlobalDefault(userId: string): Promise<IdentityScope | null> {
-    const row = this.db.get<{ userId: string }>(
-      'SELECT userId FROM "IdentityScope" WHERE userId = ? AND scope = ? LIMIT 1',
+    const row = this.db.get<any>(
+      `SELECT userId, cirviaId, identityLevel, showAgeRange, showGender, showCity, showState, showBio, showProfilePhoto, customAvatarKey
+       FROM "IdentityScope"
+       WHERE userId = ? AND scope = ?
+       LIMIT 1`,
       [userId, 'GLOBAL_DEFAULT'],
     );
 
-    return row ? this.toIdentityScope(row.userId, null) : null;
+    return row ? this.toIdentityScope(row) : null;
   }
 
   async createGlobalDefaultAnonymous(userId: string): Promise<IdentityScope> {
     this.db.run(
-      'INSERT INTO "IdentityScope" (id, userId, cirviaId, scope, createdAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
-      [randomUUID(), userId, null, 'GLOBAL_DEFAULT'],
+      `INSERT INTO "IdentityScope" (
+        id, userId, cirviaId, scope, identityLevel, showAgeRange, showGender, showCity, showState, showBio, showProfilePhoto, customAvatarKey, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [randomUUID(), userId, null, 'GLOBAL_DEFAULT', 'ANONYMOUS', 0, 0, 0, 0, 0, 0, null],
     );
 
-    return this.toIdentityScope(userId, null);
+    return this.toIdentityScope({ userId, cirviaId: null });
   }
 
   async getByUsersAndScope(userIds: string[], scopeType: ScopeType, scopeId: string | null): Promise<Map<string, IdentityScope>> {
@@ -102,14 +109,14 @@ class DbIdentityScopeRepository implements IdentityScopeRepository {
     }
 
     const placeholders = userIds.map(() => '?').join(',');
-    const rows = this.db.all<{ userId: string; cirviaId: string }>(
-      `SELECT userId, cirviaId
+    const rows = this.db.all<any>(
+      `SELECT userId, cirviaId, identityLevel, showAgeRange, showGender, showCity, showState, showBio, showProfilePhoto, customAvatarKey
        FROM "IdentityScope"
        WHERE scope = 'CIRVIA' AND cirviaId = ? AND userId IN (${placeholders})`,
       [scopeId, ...userIds],
     );
 
-    return new Map(rows.map((row) => [row.userId, this.toIdentityScope(row.userId, row.cirviaId)]));
+    return new Map(rows.map((row) => [row.userId, this.toIdentityScope(row)]));
   }
 
   async getGlobalDefaults(userIds: string[]): Promise<Map<string, IdentityScope>> {
@@ -118,26 +125,29 @@ class DbIdentityScopeRepository implements IdentityScopeRepository {
     }
 
     const placeholders = userIds.map(() => '?').join(',');
-    const rows = this.db.all<{ userId: string }>(
-      `SELECT userId FROM "IdentityScope" WHERE scope = 'GLOBAL_DEFAULT' AND userId IN (${placeholders})`,
+    const rows = this.db.all<any>(
+      `SELECT userId, cirviaId, identityLevel, showAgeRange, showGender, showCity, showState, showBio, showProfilePhoto, customAvatarKey
+       FROM "IdentityScope"
+       WHERE scope = 'GLOBAL_DEFAULT' AND userId IN (${placeholders})`,
       userIds,
     );
 
-    return new Map(rows.map((row) => [row.userId, this.toIdentityScope(row.userId, null)]));
+    return new Map(rows.map((row) => [row.userId, this.toIdentityScope(row)]));
   }
 
-  private toIdentityScope(userId: string, scopeId: string | null): IdentityScope {
+  private toIdentityScope(row: any): IdentityScope {
     return {
-      userId,
-      scopeType: scopeId ? 'CIRVIA' : 'GLOBAL_DEFAULT',
-      scopeId,
-      identityLevel: 'ANONYMOUS',
-      showAgeRange: false,
-      showGender: false,
-      showCity: false,
-      showState: false,
-      showBio: false,
-      showProfilePhoto: false,
+      userId: row.userId,
+      scopeType: row.cirviaId ? 'CIRVIA' : 'GLOBAL_DEFAULT',
+      scopeId: row.cirviaId,
+      identityLevel: row.identityLevel ?? 'ANONYMOUS',
+      showAgeRange: Boolean(row.showAgeRange),
+      showGender: Boolean(row.showGender),
+      showCity: Boolean(row.showCity),
+      showState: Boolean(row.showState),
+      showBio: Boolean(row.showBio),
+      showProfilePhoto: Boolean(row.showProfilePhoto),
+      customAvatarKey: row.customAvatarKey ?? undefined,
     };
   }
 }
@@ -299,6 +309,47 @@ export class CirviaService {
       currentUserRole: myMembership?.role ?? null,
       currentUserIdentityScope,
     };
+  }
+
+  async listMembers(cirviaId: string, actor: Actor) {
+    this.requireRole(cirviaId, actor.userId, 'MEMBER');
+
+    const members = this.db.all<any>(
+      `SELECT userId, role, status, mutedUntil, joinedAt, updatedAt
+       FROM "CirviaMember"
+       WHERE cirviaId = ? AND status <> 'REMOVED'
+       ORDER BY joinedAt ASC`,
+      [cirviaId],
+    );
+
+    const identityMap = await this.resolveIdentitiesForCirvia(
+      actor.userId,
+      cirviaId,
+      members.map((member) => member.userId),
+    );
+
+    return members.map((member) => ({
+      userId: member.userId,
+      membership: {
+        role: member.role,
+        status: member.status,
+        mutedUntil: member.mutedUntil,
+        joinedAt: member.joinedAt,
+        updatedAt: member.updatedAt,
+      },
+      identity: identityMap.get(member.userId),
+    }));
+  }
+
+  async resolveIdentitiesForCirvia(
+    viewerUserId: string,
+    cirviaId: string,
+    subjectUserIds: string[],
+  ): Promise<Map<string, ResolvedIdentityDTO>> {
+    return this.identityResolver.resolveIdentityBulk(viewerUserId, subjectUserIds, {
+      scopeType: 'CIRVIA',
+      scopeId: cirviaId,
+    });
   }
 
   async createInvite(cirviaId: string, dto: CreateInviteDto, actor: Actor) {
@@ -617,8 +668,10 @@ export class CirviaService {
 
     if (!existing) {
       this.db.run(
-        'INSERT INTO "IdentityScope" (id, userId, cirviaId, scope, createdAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [randomUUID(), userId, cirviaId, 'CIRVIA'],
+        `INSERT INTO "IdentityScope" (
+          id, userId, cirviaId, scope, identityLevel, showAgeRange, showGender, showCity, showState, showBio, showProfilePhoto, customAvatarKey, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [randomUUID(), userId, cirviaId, 'CIRVIA', 'ANONYMOUS', 0, 0, 0, 0, 0, 0, null],
       );
     }
   }
@@ -631,8 +684,10 @@ export class CirviaService {
 
     if (!existing) {
       this.db.run(
-        'INSERT INTO "IdentityScope" (id, userId, cirviaId, scope, createdAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [randomUUID(), userId, null, 'GLOBAL_DEFAULT'],
+        `INSERT INTO "IdentityScope" (
+          id, userId, cirviaId, scope, identityLevel, showAgeRange, showGender, showCity, showState, showBio, showProfilePhoto, customAvatarKey, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [randomUUID(), userId, null, 'GLOBAL_DEFAULT', 'ANONYMOUS', 0, 0, 0, 0, 0, 0, null],
       );
     }
   }

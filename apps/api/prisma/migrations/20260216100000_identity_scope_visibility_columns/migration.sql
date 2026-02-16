@@ -1,0 +1,8 @@
+ALTER TABLE "IdentityScope" ADD COLUMN "identityLevel" TEXT NOT NULL DEFAULT 'ANONYMOUS';
+ALTER TABLE "IdentityScope" ADD COLUMN "showAgeRange" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "IdentityScope" ADD COLUMN "showGender" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "IdentityScope" ADD COLUMN "showCity" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "IdentityScope" ADD COLUMN "showState" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "IdentityScope" ADD COLUMN "showBio" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "IdentityScope" ADD COLUMN "showProfilePhoto" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "IdentityScope" ADD COLUMN "customAvatarKey" TEXT;

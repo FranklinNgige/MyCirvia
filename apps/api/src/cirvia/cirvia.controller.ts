@@ -35,6 +35,11 @@ export class CirviaController {
     return this.cirviaService.getOne(id, user);
   }
 
+  @Get('/:id/members')
+  listMembers(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.cirviaService.listMembers(id, user);
+  }
+
   @Post('/:id/invites')
   createInvite(@Param('id') id: string, @Body() dto: CreateInviteDto, @CurrentUser() user: CurrentUserPayload) {
     return this.cirviaService.createInvite(id, dto, user);

@@ -101,6 +101,14 @@ model IdentityScope {
   userId    String
   cirviaId  String?
   scope     String
+  identityLevel   String  @default("ANONYMOUS")
+  showAgeRange    Boolean @default(false)
+  showGender      Boolean @default(false)
+  showCity        Boolean @default(false)
+  showState       Boolean @default(false)
+  showBio         Boolean @default(false)
+  showProfilePhoto Boolean @default(false)
+  customAvatarKey String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
   cirvia    Cirvia?  @relation(fields: [cirviaId], references: [id])

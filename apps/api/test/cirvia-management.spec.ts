@@ -29,6 +29,7 @@ describe('Cirvia management endpoints', () => {
     db.pragma('foreign_keys = ON');
     db.exec(readFileSync(join(process.cwd(), 'prisma/migrations/20260214170000_cirvia_schema/migration.sql'), 'utf8'));
     db.exec(readFileSync(join(process.cwd(), 'prisma/migrations/20260215120000_cirvia_member_removed_and_global_identity/migration.sql'), 'utf8'));
+    db.exec(readFileSync(join(process.cwd(), 'prisma/migrations/20260216100000_identity_scope_visibility_columns/migration.sql'), 'utf8'));
     db.exec(`
       INSERT INTO "User" ("id", "email") VALUES
       ('owner', 'owner@test.local'),
@@ -36,7 +37,9 @@ describe('Cirvia management endpoints', () => {
       ('moderator', 'moderator@test.local'),
       ('member', 'member@test.local'),
       ('target', 'target@test.local'),
-      ('joiner', 'joiner@test.local');
+      ('joiner', 'joiner@test.local'),
+      ('user-a', 'user-a@test.local'),
+      ('user-b', 'user-b@test.local');
     `);
     db.close();
 
@@ -212,5 +215,102 @@ describe('Cirvia management endpoints', () => {
       .set('Authorization', `Bearer ${token('target')}`)
       .send({ inviteCode: maxUsesInvite.body.inviteCode })
       .expect(400);
+  });
+
+  it('resolves member identities by cirvia scope with global fallback', async () => {
+    const cirviaOne = await request(app.getHttpServer())
+      .post('/cirvias')
+      .set('Authorization', `Bearer ${token('owner')}`)
+      .send({ name: 'Delta Cirvia', description: 'desc', visibility: 'PUBLIC', requireApproval: false, maxMembers: 50 })
+      .expect(201);
+
+    const cirviaTwo = await request(app.getHttpServer())
+      .post('/cirvias')
+      .set('Authorization', `Bearer ${token('owner')}`)
+      .send({ name: 'Epsilon Cirvia', description: 'desc', visibility: 'PUBLIC', requireApproval: false, maxMembers: 50 })
+      .expect(201);
+
+    const inviteOne = await request(app.getHttpServer())
+      .post(`/cirvias/${cirviaOne.body.id}/invites`)
+      .set('Authorization', `Bearer ${token('owner')}`)
+      .send({ expiresAt: new Date(Date.now() + 3600_000).toISOString(), maxUses: 10 })
+      .expect(201);
+
+    const inviteTwo = await request(app.getHttpServer())
+      .post(`/cirvias/${cirviaTwo.body.id}/invites`)
+      .set('Authorization', `Bearer ${token('owner')}`)
+      .send({ expiresAt: new Date(Date.now() + 3600_000).toISOString(), maxUses: 10 })
+      .expect(201);
+
+    for (const userId of ['user-a', 'user-b']) {
+      await request(app.getHttpServer())
+        .post('/cirvias/join')
+        .set('Authorization', `Bearer ${token(userId)}`)
+        .send({ inviteCode: inviteOne.body.inviteCode })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/cirvias/join')
+        .set('Authorization', `Bearer ${token(userId)}`)
+        .send({ inviteCode: inviteTwo.body.inviteCode })
+        .expect(201);
+    }
+
+    const db = new Database(dbPath);
+    db.exec(`
+      UPDATE "IdentityScope" SET "identityLevel" = 'ANONYMOUS'
+      WHERE "userId" = 'user-a' AND "scope" = 'CIRVIA' AND "cirviaId" = '${cirviaOne.body.id}';
+      UPDATE "IdentityScope" SET "identityLevel" = 'FULL', "showBio" = 1
+      WHERE "userId" = 'user-a' AND "scope" = 'CIRVIA' AND "cirviaId" = '${cirviaTwo.body.id}';
+      UPDATE "IdentityScope" SET "identityLevel" = 'PARTIAL', "showCity" = 1
+      WHERE "userId" = 'user-a' AND "scope" = 'GLOBAL_DEFAULT';
+    `);
+    db.close();
+
+    const membersInCirviaOne = await request(app.getHttpServer())
+      .get(`/cirvias/${cirviaOne.body.id}/members`)
+      .set('Authorization', `Bearer ${token('user-b')}`)
+      .expect(200);
+
+    const membersInCirviaTwo = await request(app.getHttpServer())
+      .get(`/cirvias/${cirviaTwo.body.id}/members`)
+      .set('Authorization', `Bearer ${token('user-b')}`)
+      .expect(200);
+
+    const userAInOne = membersInCirviaOne.body.find((member: any) => member.userId === 'user-a');
+    const userAInTwo = membersInCirviaTwo.body.find((member: any) => member.userId === 'user-a');
+
+    expect(userAInOne.identity.identityLevel).toBe('ANONYMOUS');
+    expect(userAInTwo.identity.identityLevel).toBe('FULL');
+
+    const dbUpdate = new Database(dbPath);
+    dbUpdate.exec(`
+      UPDATE "IdentityScope" SET "identityLevel" = 'ANONYMOUS'
+      WHERE "userId" = 'user-a' AND "scope" = 'CIRVIA' AND "cirviaId" = '${cirviaOne.body.id}';
+    `);
+    dbUpdate.close();
+
+    const stillFullInTwo = await request(app.getHttpServer())
+      .get(`/cirvias/${cirviaTwo.body.id}/members`)
+      .set('Authorization', `Bearer ${token('user-b')}`)
+      .expect(200);
+
+    const userAAfterUpdate = stillFullInTwo.body.find((member: any) => member.userId === 'user-a');
+    expect(userAAfterUpdate.identity.identityLevel).toBe('FULL');
+
+    const dbFallback = new Database(dbPath);
+    dbFallback.exec(`
+      DELETE FROM "IdentityScope"
+      WHERE "userId" = 'user-a' AND "scope" = 'CIRVIA' AND "cirviaId" = '${cirviaOne.body.id}';
+    `);
+    dbFallback.close();
+
+    const fallbackMembers = await request(app.getHttpServer())
+      .get(`/cirvias/${cirviaOne.body.id}/members`)
+      .set('Authorization', `Bearer ${token('user-b')}`)
+      .expect(200);
+
+    const userAWithFallback = fallbackMembers.body.find((member: any) => member.userId === 'user-a');
+    expect(userAWithFallback.identity.identityLevel).toBe('PARTIAL');
   });
 });
