@@ -12,9 +12,13 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node ./prisma/seed.ts"
+    "prisma:seed": "ts-node ./prisma/seed.ts",
+    "worker:dev": "ts-node src/workers/media-worker.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.840.0",
+    "@aws-sdk/s3-presigned-post": "^3.840.0",
+    "@aws-sdk/s3-request-presigner": "^3.840.0",
     "@nestjs/common": "^10.4.3",
     "@nestjs/config": "^3.2.2",
     "@nestjs/core": "^10.4.3",
@@ -27,8 +31,11 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "better-sqlite3": "^11.7.0",
+    "bullmq": "^5.56.8",
+    "ioredis": "^5.7.0",
     "pino": "^9.5.0",
-    "pino-pretty": "^11.2.2"
+    "pino-pretty": "^11.2.2",
+    "sharp": "^0.34.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",

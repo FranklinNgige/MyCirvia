@@ -11,9 +11,10 @@ import { GlobalExceptionFilter } from './errors/global-exception.filter';
 import { PermissionGuard } from './permissions/permission.guard';
 import { CirviaModule } from './cirvia/cirvia.module';
 import { FeedModule } from './feed/feed.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
-  imports: [PassportModule, CirviaModule, FeedModule],
+  imports: [PassportModule, CirviaModule, FeedModule, MediaModule],
   controllers: [AppController],
   providers: [
     JwtAccessStrategy,

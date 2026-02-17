@@ -43,3 +43,64 @@ export interface JoinPreview {
   memberCount: number;
   requiresApproval: boolean;
 }
+
+export interface FeedPost {
+  id: string;
+  cirviaId: string;
+  authorId: string;
+  contentText: string;
+  mediaKeys: string[];
+  visibility: string;
+  isPinned: boolean;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+export interface FeedPostContext {
+  post: FeedPost;
+  author: ResolvedIdentityDTO;
+  likeCount: number;
+  commentCount: number;
+  likedByCurrentUser: boolean;
+}
+
+export interface FeedPage {
+  items: FeedPostContext[];
+  nextCursor: string | null;
+}
+
+export interface CommentNode {
+  id: string;
+  postId: string;
+  authorId: string;
+  contentText: string;
+  parentCommentId?: string | null;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  author: ResolvedIdentityDTO;
+  likeCount: number;
+  likedByCurrentUser?: boolean;
+  replies: CommentNode[];
+}
+
+export interface PostCommentsResponse {
+  items: CommentNode[];
+}
+
+export interface CreatePostInput {
+  contentText: string;
+  mediaKeys?: string[];
+}
+
+export interface CreateCommentInput {
+  contentText: string;
+  parentCommentId?: string;
+}
+
+export interface LikeCountResponse {
+  likeCount: number;
+}

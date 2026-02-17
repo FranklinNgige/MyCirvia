@@ -171,3 +171,14 @@ model CommentLike {
   @@index([userId])
   @@unique([commentId, userId])
 }
+
+model Media {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  userId    String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}

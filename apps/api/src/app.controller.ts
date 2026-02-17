@@ -28,4 +28,10 @@ export class AppController {
   throwError() {
     throw new InternalServerErrorException('unique constraint violation: email');
   }
+
+  @Public()
+  @Get('/workers/health')
+  workerHealth() {
+    return { status: 'ok' };
+  }
 }
