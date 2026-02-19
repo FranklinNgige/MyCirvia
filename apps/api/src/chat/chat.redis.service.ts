@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
+import { env } from '../env';
 
 @Injectable()
 export class ChatRedisService {
@@ -8,7 +9,7 @@ export class ChatRedisService {
   private readonly counters = new Map<string, { count: number; resetAt: number }>();
 
   constructor() {
-    const redisUrl = process.env.REDIS_URL;
+    const redisUrl = env.REDIS_URL;
     if (redisUrl) {
       this.redis = new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
       void this.redis.connect().catch(() => undefined);

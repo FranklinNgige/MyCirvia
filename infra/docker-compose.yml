@@ -41,6 +41,72 @@ services:
     networks:
       - mycirvia-network
 
+  api-1:
+    profiles: ["scale"]
+    image: node:20
+    container_name: mycirvia-api-1
+    working_dir: /workspace
+    command: sh -lc "corepack enable && pnpm install --frozen-lockfile && pnpm --filter api dev"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mycirvia?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ..:/workspace
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3000:3000"
+    networks:
+      - mycirvia-network
+
+  api-2:
+    profiles: ["scale"]
+    image: node:20
+    container_name: mycirvia-api-2
+    working_dir: /workspace
+    command: sh -lc "corepack enable && pnpm install --frozen-lockfile && pnpm --filter api dev -- --port 3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mycirvia?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ..:/workspace
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3001:3001"
+    networks:
+      - mycirvia-network
+
+  worker:
+    profiles: ["scale"]
+    image: node:20
+    container_name: mycirvia-worker
+    working_dir: /workspace
+    command: sh -lc "corepack enable && pnpm install --frozen-lockfile && pnpm --filter api worker:dev"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mycirvia?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      WORKER_HEALTH_PORT: 3100
+    volumes:
+      - ..:/workspace
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3100:3100"
+    networks:
+      - mycirvia-network
+
 volumes:
   postgres_data:
   redis_data:

@@ -2,9 +2,27 @@ import { NestFactory } from '@nestjs/core';
 import { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { RedisIoAdapter } from './chat/redis-io.adapter';
+import { env } from './env';
+
+
+function resolvePort(): number {
+  const portIndex = process.argv.findIndex((arg) => arg === '--port');
+  if (portIndex >= 0) {
+    const portArg = Number(process.argv[portIndex + 1]);
+    if (!Number.isNaN(portArg) && portArg > 0) {
+      return portArg;
+    }
+  }
+  return env.PORT;
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   app.use(
     helmet({
@@ -36,7 +54,8 @@ async function bootstrap() {
     next();
   });
 
-  await app.listen(3000);
+  app.enableShutdownHooks();
+  await app.listen(resolvePort());
 }
 
 void bootstrap();
