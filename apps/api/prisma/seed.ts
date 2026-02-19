@@ -18,6 +18,10 @@ async function createUniqueInviteCode(): Promise<string> {
 }
 
 async function main() {
+  await prisma.messageReadReceipt.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.chatParticipant.deleteMany();
+  await prisma.chat.deleteMany();
   await prisma.identityScope.deleteMany();
   await prisma.cirviaMember.deleteMany();
   await prisma.cirviaInvite.deleteMany();
@@ -114,6 +118,73 @@ async function main() {
       }
     });
   }
+
+  const oneToOneA = await prisma.chat.create({
+    data: {
+      chatType: 'ONE_TO_ONE',
+      participants: {
+        createMany: {
+          data: [{ userId: owner.id }, { userId: admin.id }]
+        }
+      }
+    }
+  });
+
+  const oneToOneB = await prisma.chat.create({
+    data: {
+      chatType: 'ONE_TO_ONE',
+      participants: {
+        createMany: {
+          data: [{ userId: moderator.id }, { userId: member.id }]
+        }
+      }
+    }
+  });
+
+  const cirviaGroupChat = await prisma.chat.create({
+    data: {
+      chatType: 'CIRVIA_GROUP',
+      cirviaId: cirvias[0].id
+    }
+  });
+
+  await prisma.identityScope.createMany({
+    data: [
+      { userId: owner.id, cirviaId: null, scope: `chat:${oneToOneA.id}` },
+      { userId: admin.id, cirviaId: null, scope: `chat:${oneToOneA.id}` },
+      { userId: moderator.id, cirviaId: null, scope: `chat:${oneToOneB.id}` },
+      { userId: member.id, cirviaId: null, scope: `chat:${oneToOneB.id}` }
+    ]
+  });
+
+  await prisma.message.createMany({
+    data: [
+      {
+        chatId: oneToOneA.id,
+        senderId: owner.id,
+        contentText: 'Hey admin, welcome to direct chat.',
+        mediaKeys: JSON.stringify([])
+      },
+      {
+        chatId: oneToOneA.id,
+        senderId: admin.id,
+        contentText: 'Thanks! Sharing a quick image.',
+        mediaKeys: JSON.stringify(['uploads/direct/admin-image-1.jpg'])
+      },
+      {
+        chatId: oneToOneB.id,
+        senderId: moderator.id,
+        contentText: 'Please review moderation queue.',
+        mediaKeys: JSON.stringify([])
+      },
+      {
+        chatId: cirviaGroupChat.id,
+        senderId: owner.id,
+        contentText: 'Welcome everyone to the Public Hub group chat.',
+        mediaKeys: JSON.stringify([])
+      }
+    ]
+  });
 }
 
 main()

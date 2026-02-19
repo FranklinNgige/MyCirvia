@@ -16,9 +16,14 @@ export function AppHeader() {
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/cirvias" className="text-lg font-semibold text-indigo-700">
-          MyCirvia
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/cirvias" className="text-lg font-semibold text-indigo-700">
+            MyCirvia
+          </Link>
+          <Link href="/chats" className="text-sm font-medium text-slate-700 hover:text-indigo-700">
+            Chats
+          </Link>
+        </div>
         <div className="flex items-center gap-3">
           <button type="button" className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600">
             🔔

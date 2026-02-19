@@ -37,3 +37,18 @@ Required API environment variables for media upload pipeline:
 - **Docker services not starting:** Ensure Docker Desktop/Engine is running and ports 5432/6379/4566 are free.
 - **Database connection errors:** Verify `apps/api/.env.local` matches `infra/docker-compose.yml` connection details.
 - **pnpm install failures:** Confirm Node.js 20+ and `pnpm --version` succeeds.
+
+## Realtime chat identity events (frontend integration)
+When chat identity visibility changes, the API emits websocket room events for authorized chat participants:
+
+- `identity-revealed`
+  - payload: `{ event, chatId, revealedBy, newIdentity }`
+  - frontend behavior: update identity UI immediately + show reveal toast.
+- `identity-revoked`
+  - payload: `{ event, chatId, revokedBy, newIdentity, refreshMessages: true }`
+  - frontend behavior: update identity UI, show revoke toast, and refresh sender display names across existing messages.
+- `identity-changed`
+  - payload: `{ event, chatId, changedBy, reason, newIdentity }`
+  - emitted on reveal/revoke as a generic identity scope invalidation signal.
+
+Message text remains unchanged; only sender display identity should be re-resolved in UI.

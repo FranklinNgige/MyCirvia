@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { Chat, ChatRevealService, IdentityResolverService, InMemoryRevealStore, RevealStatus } from '../src/identity-reveal.js';
+import {
+  Chat,
+  ChatIdentityGateway,
+  ChatRevealService,
+  IdentityResolverService,
+  InMemoryRevealStore,
+  RevealStatus
+} from '../src/identity-reveal.js';
 import { ChatRevealController } from '../src/http.js';
 
 const chat: Chat = { id: 'chat-1', type: 'ONE_TO_ONE', participantAId: 'user-a', participantBId: 'user-b' };
@@ -12,7 +19,7 @@ function setup() {
 
   const service = new ChatRevealService(
     store,
-    { emitToChat: (_chatId, payload) => events.push(payload) },
+    { emitToChat: (_chat, payload) => events.push(payload) },
     { log: (action, payload) => logs.push({ action, ...payload }) },
     { notifyUser: (userId, payload) => notifications.push({ userId, ...payload }) }
   );
@@ -70,9 +77,10 @@ describe('Chat identity reveal state machine', () => {
     controller.postAcceptMutualReveal({ params: { chatId: chat.id }, userId: 'user-b' });
     controller.postRevokeReveal({ params: { chatId: chat.id }, userId: 'user-a' });
 
-    expect(events.some((e) => e.type === 'identity:revealed')).toBe(true);
+    expect(events.some((e) => e.event === 'identity-revealed')).toBe(true);
     expect(events.some((e) => e.type === 'identity:mutual-confirmed')).toBe(true);
-    expect(events.some((e) => e.type === 'identity:revoked')).toBe(true);
+    expect(events.some((e) => e.event === 'identity-revoked')).toBe(true);
+    expect(events.some((e) => e.event === 'identity-changed')).toBe(true);
 
     expect(logs.map((l) => l.action)).toEqual([
       'chat.identity.reveal',
@@ -97,5 +105,58 @@ describe('Chat identity reveal state machine', () => {
     expect(status.status).toBe(RevealStatus.ONE_SIDED_A_TO_B);
     expect(status.canRevoke).toBe(true);
     expect(status.otherUserIdentity).toBeDefined();
+  });
+
+  it('emits reveal event with resolved identity payload', () => {
+    const { controller, events } = setup();
+
+    controller.postReveal({ params: { chatId: chat.id }, userId: 'user-a' });
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        event: 'identity-revealed',
+        revealedBy: 'user-a',
+        newIdentity: expect.objectContaining({ userId: 'user-a', scope: 'FULL' })
+      })
+    );
+  });
+
+  it('emits revoke event with resolved identity payload and refresh hint', () => {
+    const { controller, events } = setup();
+
+    controller.postReveal({ params: { chatId: chat.id }, userId: 'user-a' });
+    controller.postRevokeReveal({ params: { chatId: chat.id }, userId: 'user-a' });
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        event: 'identity-revoked',
+        revokedBy: 'user-a',
+        refreshMessages: true,
+        newIdentity: expect.objectContaining({ userId: 'user-a', scope: 'GLOBAL_DEFAULT' })
+      })
+    );
+  });
+
+  it('propagates identity updates only to authorized participants', () => {
+    const store = new InMemoryRevealStore();
+    const gateway = new ChatIdentityGateway();
+    const service = new ChatRevealService(
+      store,
+      gateway,
+      { log: () => undefined },
+      { notifyUser: () => undefined }
+    );
+
+    const participantAEvents: Record<string, unknown>[] = [];
+    const participantBEvents: Record<string, unknown>[] = [];
+    gateway.subscribe(chat, 'user-a', (event) => participantAEvents.push(event));
+    gateway.subscribe(chat, 'user-b', (event) => participantBEvents.push(event));
+
+    expect(() => gateway.subscribe(chat, 'intruder', () => undefined)).toThrow('User is not authorized for chat room');
+
+    service.reveal(chat, 'user-a');
+
+    expect(participantAEvents.some((event) => event.event === 'identity-revealed')).toBe(true);
+    expect(participantBEvents.some((event) => event.event === 'identity-revealed')).toBe(true);
   });
 });

@@ -12,9 +12,10 @@ import { PermissionGuard } from './permissions/permission.guard';
 import { CirviaModule } from './cirvia/cirvia.module';
 import { FeedModule } from './feed/feed.module';
 import { MediaModule } from './media/media.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
-  imports: [PassportModule, CirviaModule, FeedModule, MediaModule],
+  imports: [PassportModule, CirviaModule, FeedModule, MediaModule, ChatModule],
   controllers: [AppController],
   providers: [
     JwtAccessStrategy,

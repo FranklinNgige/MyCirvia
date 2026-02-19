@@ -19,6 +19,9 @@ model User {
   comments        Comment[]
   postLikes       PostLike[]
   commentLikes    CommentLike[]
+  chatParticipants ChatParticipant[]
+  sentMessages    Message[]        @relation("MessageSender")
+  messageReadReceipts MessageReadReceipt[]
 }
 
 model Cirvia {
@@ -38,6 +41,68 @@ model Cirvia {
   chat            CirviaChat?
   identityScopes  IdentityScope[]
   posts           Post[]
+  chats           Chat[]
+}
+
+model Chat {
+  id           String            @id @default(uuid())
+  chatType     String
+  cirviaId     String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  cirvia       Cirvia?           @relation(fields: [cirviaId], references: [id])
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@index([cirviaId])
+}
+
+model ChatParticipant {
+  id         String   @id @default(uuid())
+  chatId     String
+  userId     String
+  joinedAt   DateTime @default(now())
+  lastReadAt DateTime?
+  chat       Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([userId])
+  @@unique([chatId, userId])
+}
+
+model Message {
+  id          String    @id @default(uuid())
+  chatId       String
+  senderId     String
+  contentText  String
+  mediaKeys    String
+  isDeleted    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  chat         Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender       User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  readReceipts MessageReadReceipt[]
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@index([chatId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+model MessageReadReceipt {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([userId])
+  @@unique([messageId, userId])
 }
 
 model CirviaMember {

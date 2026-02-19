@@ -37,7 +37,7 @@ export interface ChatIdentityReveal {
 }
 
 interface EventBus {
-  emitToChat(chatId: string, payload: Record<string, unknown>): void;
+  emitToChat(chat: Chat, payload: Record<string, unknown>): void;
 }
 
 interface AuditLogger {
@@ -169,13 +169,21 @@ export class ChatRevealService {
 
     this.store.upsertReveal(next);
     this.store.setScope(chat.id, otherUserId, 'FULL');
+    const newIdentity = this.resolveIdentityFor(chat, currentUserId, otherUserId);
 
     if (reverse && this.isOneSided(reverse.status)) {
       this.store.upsertReveal({ ...reverse, status: RevealStatus.MUTUAL_CONFIRMED, confirmedAt: now, revokedAt: null });
       this.store.setScope(chat.id, currentUserId, 'FULL');
     }
 
-    this.eventBus.emitToChat(chat.id, { type: 'identity:revealed', chatId: chat.id, revealedByUserId: currentUserId });
+    this.eventBus.emitToChat(chat, { event: 'identity-revealed', chatId: chat.id, revealedBy: currentUserId, newIdentity });
+    this.eventBus.emitToChat(chat, {
+      event: 'identity-changed',
+      chatId: chat.id,
+      changedBy: currentUserId,
+      reason: 'reveal',
+      newIdentity
+    });
     this.audit.log('chat.identity.reveal', { chatId: chat.id, actorUserId: currentUserId, targetUserId: otherUserId, status });
 
     return next;
@@ -227,7 +235,7 @@ export class ChatRevealService {
     this.store.setScope(chat.id, currentUserId, 'FULL');
     this.store.setScope(chat.id, otherUserId, 'FULL');
 
-    this.eventBus.emitToChat(chat.id, { type: 'identity:mutual-confirmed', chatId: chat.id, confirmedByUserId: currentUserId });
+    this.eventBus.emitToChat(chat, { type: 'identity:mutual-confirmed', chatId: chat.id, confirmedByUserId: currentUserId });
     this.audit.log('chat.identity.accept_mutual_reveal', { chatId: chat.id, actorUserId: currentUserId, targetUserId: otherUserId });
 
     return accepted;
@@ -256,8 +264,22 @@ export class ChatRevealService {
     }
 
     this.store.setScope(chat.id, otherUserId, 'GLOBAL_DEFAULT');
+    const newIdentity = this.resolveIdentityFor(chat, currentUserId, otherUserId);
 
-    this.eventBus.emitToChat(chat.id, { type: 'identity:revoked', chatId: chat.id, revokedByUserId: currentUserId });
+    this.eventBus.emitToChat(chat, {
+      event: 'identity-revoked',
+      chatId: chat.id,
+      revokedBy: currentUserId,
+      newIdentity,
+      refreshMessages: true
+    });
+    this.eventBus.emitToChat(chat, {
+      event: 'identity-changed',
+      chatId: chat.id,
+      changedBy: currentUserId,
+      reason: 'revoke',
+      newIdentity
+    });
     this.audit.log('chat.identity.revoke', { chatId: chat.id, actorUserId: currentUserId, targetUserId: otherUserId, status: revoked });
 
     return next;
@@ -295,5 +317,43 @@ export class ChatRevealService {
   private getDirectionalStatus(chat: Chat, fromUserId: string, toUserId: string): RevealStatus {
     const isAtoB = chat.participantAId === fromUserId && chat.participantBId === toUserId;
     return isAtoB ? RevealStatus.ONE_SIDED_A_TO_B : RevealStatus.ONE_SIDED_B_TO_A;
+  }
+
+  private resolveIdentityFor(chat: Chat, subjectUserId: string, viewerUserId: string): ResolvedIdentityDTO {
+    const resolver = new IdentityResolverService(this.store);
+    return resolver.resolveForChat1to1(chat, subjectUserId, viewerUserId);
+  }
+}
+
+type Listener = (payload: Record<string, unknown>) => void;
+
+export class ChatIdentityGateway implements EventBus {
+  private readonly listenersByChat = new Map<string, Map<string, Set<Listener>>>();
+
+  subscribe(chat: Chat, userId: string, listener: Listener): () => void {
+    if (userId !== chat.participantAId && userId !== chat.participantBId) {
+      throw new Error('User is not authorized for chat room');
+    }
+
+    const chatListeners = this.listenersByChat.get(chat.id) ?? new Map<string, Set<Listener>>();
+    const userListeners = chatListeners.get(userId) ?? new Set<Listener>();
+    userListeners.add(listener);
+    chatListeners.set(userId, userListeners);
+    this.listenersByChat.set(chat.id, chatListeners);
+
+    return () => {
+      this.listenersByChat.get(chat.id)?.get(userId)?.delete(listener);
+    };
+  }
+
+  emitToChat(chat: Chat, payload: Record<string, unknown>): void {
+    const chatListeners = this.listenersByChat.get(chat.id);
+    if (!chatListeners) {
+      return;
+    }
+
+    [chat.participantAId, chat.participantBId].forEach((participantId) => {
+      chatListeners.get(participantId)?.forEach((listener) => listener(payload));
+    });
   }
 }
